@@ -33,7 +33,7 @@ module systolic_array_4x4
     input logic [7:0] a_in [4][4], 
     input logic [7:0] b_in [4][4],
     output logic [19:0] acc [4][4],
-    output logic done);
+    output logic comp_done);
     
     logic [7:0] a_wire [4][4];
     logic [7:0] b_wire [4][4];
@@ -83,3 +83,48 @@ module systolic_array_4x4
     endgenerate
 
 endmodule: systolic_array_4x4
+
+
+module control_fsm 
+    (input logic clk, rst_n,
+    input logic load_done, out_done, comp_done,
+    output logic clear, start,
+    output logic spi_tx_en
+    );
+
+typedef enum logic [1:0] {IDLE, LOAD, COMPUTE, DRAIN} state_t;
+state_t currState, nextState;
+
+always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) currState <= IDLE;
+    else currState <= nextState;
+end
+
+always_comb begin
+    nextState = currState;
+    clear = 1'b0;
+    start = 1'b0;
+    spi_tx_en =  1'b0;
+
+    case (currState)
+        IDLE: begin
+            if (load_done) begin
+                nextState = LOAD;
+            end
+        end
+        LOAD: begin
+            clear = 1'b1;
+            start = 1'b1;
+            nextState = COMPUTE;
+        end
+        COMPUTE : begin
+            if (comp_done) nextState = DRAIN;
+        end
+        DRAIN : begin
+            spi_tx_en = 1'b1;
+            if (out_done) nextState = IDLE;
+        end
+    endcase
+end
+
+endmodule: control_fsm
