@@ -128,3 +128,128 @@ always_comb begin
 end
 
 endmodule: control_fsm
+
+module spi_slave 
+    (input logic clk, rst_n,
+     input logic sck, mosi, cs,
+     output logic [7:0] a_out [4][4],
+     output logic [7:0] b_out [4][4],
+     output logic load_done
+    );
+
+
+    logic sck_sync, mosi_sync, cs_sync;  // synchronizer outputs
+    logic sck_prev, sck_curr;             // edge detection
+    logic rising_edge;                    // SCK rising edge pulse
+    logic [7:0] shift_reg;               // incoming bit accumulator
+    logic [2:0] bit_cnt;                 // counts 0-7 within a byte
+    logic [5:0] byte_cnt;                // counts 0-32 across the frame
+    logic cs_prev;
+
+    assign rising_edge = sck_curr & ~sck_prev;
+
+    Synchronizer s0 (.async(sck), .clk(clk), .sync(sck_sync)),
+                 s1 (.async(mosi), .clk(clk), .sync(mosi_sync)),
+                 s2 (.async(cs), .clk(clk), .sync(cs_sync));
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            bit_cnt <= 3'd0;
+            byte_cnt <= 6'd0;
+            shift_reg <= 8'd0;
+            load_done <= 1'd0;
+        end  else begin
+            sck_prev <= sck_curr;
+            sck_curr <= sck_sync;
+
+        cs_prev <= cs_sync;
+        if (cs_sync && !cs_prev) begin
+            bit_cnt <= 3'd0;
+            byte_cnt <= 6'd0;
+            load_done <= 1'd0;
+        end
+
+        if (rising_edge && !cs_sync) begin
+
+            shift_reg[7:0] <= {shift_reg[6:0], mosi_sync};
+            bit_cnt <= bit_cnt + 1;
+
+
+            if (byte_cnt == 32) load_done <= 1'b1;
+
+            //write bytes
+            if (bit_cnt == 3'd7) begin
+                byte_cnt <= byte_cnt + 1;
+            
+                if (byte_cnt == 0) begin
+                    // ignore
+                end else if (byte_cnt < 17) begin
+                    a_out[(byte_cnt - 1) / 4][(byte_cnt - 1) % 4] <= shift_reg;
+                end else if (byte_cnt >= 17) begin
+                    b_out[(byte_cnt - 17) / 4][(byte_cnt - 17) % 4] <= shift_reg;
+                end
+            end
+        end
+    end
+    end
+
+
+endmodule: spi_slave
+
+module DFlipFlop
+  (input  logic d,
+   input  logic preset_L, reset_L, clk,
+   output logic q);
+
+  always_ff @(posedge clk, negedge preset_L, negedge reset_L)
+    if (~preset_L & reset_L)
+      q <= 1'b1;
+    else if (~reset_L & preset_L)
+      q <= 1'b0;
+    else if (~reset_L & ~preset_L)
+      q <= 1'bX;
+    else
+      q <= d;
+
+endmodule : DFlipFlop
+
+
+module Synchronizer
+  (input  logic async, clk,
+   output logic sync);
+
+  logic metastable;
+
+  DFlipFlop one(.d(async),
+                .q(metastable),
+                .clk,
+                .preset_L(1'b1),
+                .reset_L(1'b1)
+               );
+
+  DFlipFlop two(.d(metastable),
+                .q(sync),
+                .clk,
+                .preset_L(1'b1),
+                .reset_L(1'b1)
+               );
+
+endmodule : Synchronizer
+
+module Counter (
+    input  logic       clk,    // Clock
+    input  logic       rst_n,    // Active-high reset
+    input  logic       en,     // Enable
+    output logic [7:0] count   // 4-bit output
+);
+
+    // Always block triggered on positive edge of clock or reset
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            count <= 8'b00000000; // Reset counter
+        end else if (en) begin
+            count <= count + 1'b1; // Increment counter
+        end
+    end
+
+endmodule: Counter
