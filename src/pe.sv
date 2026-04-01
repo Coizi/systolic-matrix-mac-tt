@@ -61,7 +61,7 @@ module systolic_array_4x4
         end
     endgenerate
 
-    assign done = (cnt == 4'd7);
+    assign comp_done = (cnt == 4'd7);
 
 
     genvar i, j;
