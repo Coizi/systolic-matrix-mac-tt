@@ -5,7 +5,7 @@ module control_fsm
     output logic spi_tx_en
     );
 
-typedef enum logic [1:0] {IDLE, LOAD, COMPUTE, DRAIN} state_t;
+typedef enum logic [2:0] {IDLE, CLEAR, LOAD, COMPUTE, DRAIN} state_t;
 state_t currState, nextState;
 
 always_ff @(posedge clk or negedge rst_n) begin
@@ -25,12 +25,16 @@ always_comb begin
                 nextState = LOAD;
             end
         end
-        LOAD: begin
+        CLEAR: begin
             clear = 1'b1;
+            nextState = LOAD;
+        end
+        LOAD: begin
             start = 1'b1;
             nextState = COMPUTE;
         end
         COMPUTE : begin
+            start = 1'b1;
             if (comp_done) nextState = DRAIN;
         end
         DRAIN : begin

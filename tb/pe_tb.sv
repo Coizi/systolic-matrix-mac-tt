@@ -12,7 +12,7 @@ class PETransaction;
 endclass
 
 module pe_tb;
-    logic clk, rst_n, clear;
+    logic clk, rst_n, clear, start;
     logic [7:0] a_in, b_in;
     logic [7:0] a_out, b_out;
     logic [19:0] acc;
@@ -27,6 +27,7 @@ module pe_tb;
         a_in, b_in, a_out, b_out, acc);
         clk = 0;
         clear = 0;
+        start = 0;
         rst_n = 0;
         rst_n <= 1; 
         forever #10 clk = ~clk;
@@ -37,13 +38,13 @@ module pe_tb;
         a_in = 0; b_in = 0;
         @(posedge clk); @(posedge clk);
         pass_count = 0;
-        repeat(500) begin
+        repeat(1000) begin
             assert(txn.randomize()) else $fatal(1, "randomize failed");
             $display("a=%0d b=%0d", txn.a_in, txn.b_in);
             drive_and_check(txn.a_in, txn.b_in);
         end
-        $display("500 tests done");
-        $display("%0d/500 tests passed", pass_count);
+        $display("1000 tests done");
+        $display("%0d/1000 tests passed", pass_count);
         $finish;
 
     end
@@ -51,9 +52,12 @@ module pe_tb;
     task automatic drive_and_check(input logic [7:0] a, b);
         a_in = a;
         b_in = b;
+        start = 1'b1;
         @(posedge clk);
         a_in = 0;
         b_in = 0;
+        @(posedge clk);
+        start = 0;
         @(posedge clk);
         @(posedge clk);
         expected = 20'(a) * 20'(b);
@@ -64,8 +68,7 @@ module pe_tb;
         clear = 1;
         @(posedge clk);
         clear = 0;
+        @(posedge clk);
         endtask
-
-
 
 endmodule: pe_tb

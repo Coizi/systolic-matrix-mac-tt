@@ -33,7 +33,7 @@ module systolic_array_4x4
         end
     endgenerate
 
-    assign comp_done = (cnt == 4'd7);
+    assign comp_done = (cnt == 4'd9);
 
     genvar i, j;
     generate
@@ -43,6 +43,7 @@ module systolic_array_4x4
                     .clk(clk),
                     .rst_n(rst_n),
                     .clear(clear),
+                    .start(start),
                     .a_in(j == 0 ? boundary_a[i] : a_wire[i][j-1]),
                     .b_in(i == 0 ? boundary_b[j] : b_wire[i-1][j]),
                     .a_out(a_wire[i][j]),
